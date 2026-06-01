@@ -113,11 +113,7 @@
 
         // Fetch visitor locations from Supabase
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        const { data, error } = await supabase
-          .from('visitor_locations')
-          .select('lat, lon, city, country, visited_at')
-          .order('visited_at', { ascending: false })
-          .limit(500);
+        const { data, error } = await supabase.rpc('get_visitor_dots');
 
         if (error || !data) return;
 
