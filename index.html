@@ -71,26 +71,28 @@
   <footer>Approximate locations only &middot; No personal data stored</footer>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
     // ─── CONFIG ────────────────────────────────────────────────────────
     const SUPABASE_URL = 'https://ilpleaczzjjeunygqfuu.supabase.co';  // Replace with your Project URL
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlscGxlYWN6empqZXVueWdxZnV1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzMDgxODksImV4cCI6MjA5NTg4NDE4OX0.Xjd3eR0f1umn-YHsKronsRUE5Hg3YQaLzAqX8Pcr3K0';               // Replace with your anon public key
     const EDGE_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/log-visit`;
 
-    // ─── SILENT VISITOR PING ───────────────────────────────────────────
-    (function pingVisit() {
+    // ─── SILENT VISITOR PING, THEN LOAD MAP ───────────────────────────
+    (async function init() {
+      // Ping first, wait for it to complete, then load map
       try {
-        fetch(EDGE_FUNCTION_URL, {
+        await fetch(EDGE_FUNCTION_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({}),
-        }).catch(() => {});
+        });
       } catch (e) { /* fail silently */ }
+
+      loadMap();
     })();
 
-    // ─── MAP SETUP ─────────────────────────────────────────────────────
-    (async function initMap() {
+    async function loadMap() {
       try {
         const map = L.map('map', {
           center: [20, 0],
@@ -145,7 +147,7 @@
           );
         });
       } catch (e) { /* fail silently */ }
-    })();
+    }
   </script>
 </body>
 </html>
