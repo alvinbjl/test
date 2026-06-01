@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Visitor Map</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #1a1a2e;
+      color: #e0e0e0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      padding: 1.5rem 2rem;
+      text-align: center;
+    }
+
+    header h1 {
+      font-size: 1.4rem;
+      font-weight: 600;
+      color: #f0f0f0;
+      letter-spacing: 0.02em;
+    }
+
+    header p {
+      font-size: 0.85rem;
+      color: #888;
+      margin-top: 0.3rem;
+    }
+
+    #map {
+      flex: 1;
+      min-height: 500px;
+      border-radius: 12px;
+      margin: 0 1.5rem 1.5rem;
+      overflow: hidden;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+    }
+
+    .leaflet-container {
+      background: #16213e;
+    }
+
+    footer {
+      text-align: center;
+      padding: 1rem;
+      font-size: 0.75rem;
+      color: #555;
+    }
+
+    @media (max-width: 600px) {
+      header { padding: 1rem; }
+      header h1 { font-size: 1.1rem; }
+      #map { margin: 0 0.75rem 0.75rem; min-height: 400px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Visitor Locations</h1>
+    <p id="visitor-count"></p>
+  </header>
+  <div id="map"></div>
+  <footer>Approximate locations only &middot; No personal data stored</footer>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script>
+    // ─── CONFIG ────────────────────────────────────────────────────────
+    const SUPABASE_URL = 'https://ilpleaczzjjeunygqfuu.supabase.co';  // Replace with your Project URL
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlscGxlYWN6empqZXVueWdxZnV1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzMDgxODksImV4cCI6MjA5NTg4NDE4OX0.Xjd3eR0f1umn-YHsKronsRUE5Hg3YQaLzAqX8Pcr3K0';               // Replace with your anon public key
+    const EDGE_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/log-visit`;
+
+    // ─── SILENT VISITOR PING ───────────────────────────────────────────
+    (function pingVisit() {
+      try {
+        fetch(EDGE_FUNCTION_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({}),
+        }).catch(() => {});
+      } catch (e) { /* fail silently */ }
+    })();
+
+    // ─── MAP SETUP ─────────────────────────────────────────────────────
+    (async function initMap() {
+      try {
+        const map = L.map('map', {
+          center: [20, 0],
+          zoom: 2,
+          minZoom: 2,
+          maxZoom: 12,
+          zoomControl: true,
+          attributionControl: true,
+        });
+
+        // Dark muted tile layer (CartoDB Dark Matter)
+        L.tileLayer(
+          'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+          {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
+            subdomains: 'abcd',
+            maxZoom: 19,
+          }
+        ).addTo(map);
+
+        // Fetch visitor locations from Supabase
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        const { data, error } = await supabase
+          .from('visitor_locations')
+          .select('lat, lon, city, country, visited_at')
+          .order('visited_at', { ascending: false })
+          .limit(500);
+
+        if (error || !data) return;
+
+        // Update visitor count
+        const countEl = document.getElementById('visitor-count');
+        if (countEl) {
+          countEl.textContent = `${data.length} visit${data.length !== 1 ? 's' : ''} recorded`;
+        }
+
+        // Add dots to map
+        data.forEach((v) => {
+          const circle = L.circleMarker([v.lat, v.lon], {
+            radius: 5,
+            color: 'transparent',
+            fillColor: '#4fc3f7',
+            fillOpacity: 0.7,
+            weight: 0,
+          }).addTo(map);
+
+          const label = [v.city, v.country].filter(Boolean).join(', ') || 'Unknown';
+          const time = new Date(v.visited_at).toLocaleDateString(undefined, {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+          });
+          circle.bindPopup(
+            `<strong>${label}</strong><br><span style="color:#888;font-size:0.8em">${time}</span>`,
+            { className: 'dark-popup' }
+          );
+        });
+      } catch (e) { /* fail silently */ }
+    })();
+  </script>
+</body>
+</html>
